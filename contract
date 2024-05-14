@@ -1,0 +1,68 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC20/extensions/ERC20Burnable.sol";
+import "hardhat/console.sol";
+
+contract coolerToken is ERC20, Ownable, ERC20Burnable {
+    event LogMessage(string message);
+
+    struct AirCooler {
+        string model;
+        uint256 cost;
+        uint256 inventory;
+    }
+
+    mapping(string => AirCooler) public airCoolers;
+    mapping(address => uint256) public userTokenBalances;
+
+    constructor() ERC20("cooler", "CLR") Ownable(msg.sender) {
+        airCoolers["Portable"] = AirCooler("Portable", 200, 10);
+        airCoolers["Room"] = AirCooler("Room", 300, 20);
+        airCoolers["Window"] = AirCooler("Window", 400, 15);
+    }
+
+    function mintTokens(address recipientAddress, uint256 tokenAmount) public onlyOwner {
+        _mint(recipientAddress, tokenAmount);
+    }
+
+    function burnTokens(uint256 tokenAmount) public payable {
+        require(balanceOf(msg.sender) >= tokenAmount, "Insufficient balance to burn tokens");
+        _burn(msg.sender, tokenAmount);
+        emit LogMessage("Burned tokens");
+    }
+
+    function transferTokens(address recipientAddress, uint256 tokenAmount) external {
+        require(balanceOf(msg.sender) >= tokenAmount, "Insufficient balance to transfer tokens");
+        _transfer(msg.sender, recipientAddress, tokenAmount);
+    }
+
+    function redeemAirCooler(string memory coolerType, uint256 quantity) external payable {
+        require(bytes(coolerType).length > 0, "Invalid cooler type");
+        require(quantity > 0, "Quantity must be greater than zero");
+        require(balanceOf(msg.sender) >= airCoolers[coolerType].cost * quantity, "Insufficient funds to redeem air cooler");
+        
+        AirCooler storage cooler = airCoolers[coolerType];
+        require(cooler.inventory >= quantity, "Insufficient air cooler quantity");
+
+        _burn(msg.sender, cooler.cost * quantity);
+        userTokenBalances[msg.sender] += quantity;
+        cooler.inventory -= quantity;
+
+        emit LogMessage("Redeemed air cooler");
+    }
+
+    // New function: Check user token balance
+    function getUserTokenBalance() external view returns (uint256) {
+        return userTokenBalances[msg.sender];
+    }
+    
+    function addAirCoolerQuantity(string memory coolerType, uint256 quantity) external onlyOwner {
+        require(airCoolers[coolerType].cost != 0, "Invalid air cooler type");
+        airCoolers[coolerType].inventory += quantity;
+    }
+    
+   
+}
